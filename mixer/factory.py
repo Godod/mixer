@@ -3,12 +3,11 @@
 import datetime
 import decimal
 
-from . import _compat as _, mix_types as t
+from . import mix_types as t
 from ._faker import faker
 
 
 class GenFactoryMeta(type):
-
     """ Precache generators. """
 
     def __new__(mcs, name, bases, params):
@@ -25,7 +24,7 @@ class GenFactoryMeta(type):
         fakers.update(params.get('fakers', dict()))
         types.update(params.get('types', dict()))
 
-        types = dict(mcs.__flat_keys(types))
+        types = dict(mcs._flat_keys(types))
 
         if types:
             for atype, btype in types.items():
@@ -34,16 +33,16 @@ class GenFactoryMeta(type):
                     generators[atype] = factory
 
         generators.update(params.get('generators', dict()))
-        generators = dict(mcs.__flat_keys(generators))
+        generators = dict(mcs._flat_keys(generators))
 
         params['generators'] = generators
         params['fakers'] = fakers
         params['types'] = types
 
-        return super(GenFactoryMeta, mcs).__new__(mcs, name, bases, params)
+        return super().__new__(mcs, name, bases, params)
 
     @staticmethod
-    def __flat_keys(d):
+    def _flat_keys(d):
         for key, value in d.items():
             if isinstance(key, (tuple, list)):
                 for k in key:
@@ -52,8 +51,7 @@ class GenFactoryMeta(type):
             yield key, value
 
 
-class GenFactory(_.with_metaclass(GenFactoryMeta)):
-
+class GenFactory(metaclass=GenFactoryMeta):
     """ Make generators for types. """
 
     generators = {
@@ -71,6 +69,7 @@ class GenFactory(_.with_metaclass(GenFactoryMeta)):
         datetime.time: faker.time,
         decimal.Decimal: faker.pydecimal,
         t.BigInteger: faker.big_integer,
+        t.CommaSeparatedInteger: faker.int_range,
         t.EmailString: faker.email,
         t.HostnameString: faker.domain_name,
         t.IP4String: faker.ipv4,
@@ -124,8 +123,8 @@ class GenFactory(_.with_metaclass(GenFactoryMeta)):
     }
 
     types = {
-        _.string_types: str,
-        _.integer_types: int,
+        str: str,
+        int: int,
     }
 
     @classmethod
@@ -160,7 +159,7 @@ class GenFactory(_.with_metaclass(GenFactoryMeta)):
         simple = cls.cls_to_simple(fcls)
         func = cls.generators.get(fcls) or cls.generators.get(simple)
 
-        if not func and fcls.__bases__:
+        if not func and hasattr(fcls, '__bases__'):
             func = cls.generators.get(fcls.__bases__[0])
 
         if fname and fake and (fname, simple) in cls.fakers:

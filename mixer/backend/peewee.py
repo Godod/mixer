@@ -7,7 +7,7 @@
 """
 from __future__ import absolute_import
 
-from peewee import * # noqa
+from peewee import *  # noqa
 import datetime
 import decimal
 
@@ -23,9 +23,9 @@ def get_relation(_scheme=None, _typemixer=None, **params):
 
     return TypeMixer(
         scheme,
-        mixer=_typemixer._TypeMixer__mixer,
-        factory=_typemixer._TypeMixer__factory,
-        fake=_typemixer._TypeMixer__fake,
+        mixer=_typemixer._mixer,
+        factory=_typemixer._factory,
+        fake=_typemixer._fake,
     ).blend(**params)
 
 
@@ -35,7 +35,6 @@ def get_blob(**kwargs):
 
 
 class GenFactory(BaseFactory):
-
     """ Map a peewee classes to simple types. """
 
     types = {
@@ -60,25 +59,24 @@ class GenFactory(BaseFactory):
 
 
 class TypeMixer(BaseTypeMixer):
-
     """ TypeMixer for Peewee ORM. """
 
     factory = GenFactory
 
-    def __load_fields(self):
-        for field in self.__scheme._meta.sorted_fields:
+    def _load_fields(self):
+        for field in self._scheme._meta.sorted_fields:
             yield field.name, t.Field(field, field.name)
 
     def populate_target(self, values):
         """ Populate target. """
-        return self.__scheme(**dict(values))
+        return self._scheme(**dict(values))
 
     def gen_field(self, field):
         """ Function description. """
-        if isinstance(field.scheme, PrimaryKeyField)\
-                and self.__mixer and self.__mixer.params.get('commit'):
+        if isinstance(field.scheme, PrimaryKeyField) \
+                and self._mixer and self._mixer.params.get('commit'):
             return field.name, SKIP_VALUE
-        return super(TypeMixer, self).gen_field(field)
+        return super().gen_field(field)
 
     def gen_select(self, field_name, select):
         """ Select exists value from database.
@@ -88,7 +86,7 @@ class TypeMixer(BaseTypeMixer):
         :return : None or (name, value) for later use
 
         """
-        field = self.__fields[field_name]
+        field = self._fields[field_name]
         if not isinstance(field.scheme, ForeignKeyField):
             return field_name, SKIP_VALUE
 
@@ -119,9 +117,10 @@ class TypeMixer(BaseTypeMixer):
         :return value:
 
         """
-        return field.scheme.default is None and SKIP_VALUE or field.scheme.default # noqa
+        return field.scheme.default is None and SKIP_VALUE or field.scheme.default  # noqa
 
-    def make_fabric(self, field, field_name=None, fake=False, kwargs=None): # noqa
+    def make_fabric(self, field, field_name=None, fake=False,
+                    kwargs=None):  # noqa
         """ Make values fabric for column.
 
         :param column: SqlAlchemy column
@@ -143,7 +142,7 @@ class TypeMixer(BaseTypeMixer):
         if isinstance(field, ForeignKeyField):
             kwargs.update({'_typemixer': self, '_scheme': field})
 
-        return super(TypeMixer, self).make_fabric(
+        return super().make_fabric(
             type(field), field_name=field_name, fake=fake, kwargs=kwargs)
 
     def guard(self, *args, **kwargs):
@@ -152,7 +151,7 @@ class TypeMixer(BaseTypeMixer):
         :returns: A finded object or False
 
         """
-        qs = self.__scheme.select().where(*args, **kwargs)
+        qs = self._scheme.select().where(*args, **kwargs)
         count = qs.count()
 
         if count == 1:
@@ -167,11 +166,11 @@ class TypeMixer(BaseTypeMixer):
         """ Reload object from database. """
         if not obj.get_id():
             raise ValueError("Cannot load the object: %s" % obj)
-        return type(obj).select().where(obj._meta.primary_key == obj.get_id()).get()
+        return type(obj).select().where(
+            obj._meta.primary_key == obj.get_id()).get()
 
 
 class Mixer(BaseMixer):
-
     """ Integration with Peewee ORM. """
 
     type_mixer_cls = TypeMixer
@@ -179,7 +178,7 @@ class Mixer(BaseMixer):
     def __init__(self, **params):
         """Initialize the Mixer instance."""
         params.setdefault('commit', True)
-        super(Mixer, self).__init__(**params)
+        super().__init__(**params)
 
     def postprocess(self, target):
         """ Save objects in db.

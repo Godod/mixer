@@ -1,24 +1,22 @@
-import marshmallow as ma
+from marshmallow import validate, fields, Schema
 import pytest
 
 
-class Person(ma.Schema):
-
-    name = ma.fields.String()
-    status = ma.fields.String(
+class Person(Schema):
+    name = fields.String()
+    status = fields.String(
         required=True,
-        validate=ma.validate.OneOf(choices=('user', 'moderator', 'admin')))
-    created = ma.fields.DateTime()
-    birthday = ma.fields.Date()
-    is_relative = ma.fields.Bool()
+        validate=validate.OneOf(choices=('user', 'moderator', 'admin')))
+    created = fields.DateTime()
+    birthday = fields.Date()
+    is_relative = fields.Bool()
 
 
-class Pet(ma.Schema):
-
-    name = ma.fields.String()
-    animal_type = ma.fields.String(default='cat')
-    owner = ma.fields.Nested(Person, many=True)
-    awards = ma.fields.List(ma.fields.Str)
+class Pet(Schema):
+    name = fields.String()
+    animal_type = fields.String(default='cat')
+    owner = fields.Nested(Person, many=True)
+    awards = fields.List(fields.Str())
 
 
 @pytest.fixture

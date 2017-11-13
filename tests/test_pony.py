@@ -9,9 +9,10 @@ pytestmark = pytest.mark.skipif(
 
 try:
 
-    from pony.orm import * # noqa
+    from pony.orm import *  # noqa
 
     db = Database("sqlite", ":memory:", create_db=True)
+
 
     class Customer(db.Entity):
         address = Required(unicode)
@@ -22,6 +23,7 @@ try:
 
         cart_items = Set("CartItem")
         orders = Set("Order")
+
 
     class Product(db.Entity):
         id = PrimaryKey(int, auto=True)
@@ -34,10 +36,12 @@ try:
         cart_items = Set("CartItem")
         order_items = Set("OrderItem")
 
+
     class CartItem(db.Entity):
         quantity = Required(int)
         customer = Required(Customer)
         product = Required(Product)
+
 
     class OrderItem(db.Entity):
         quantity = Required(int, default=1)
@@ -45,6 +49,7 @@ try:
         order = Required("Order")
         product = Required(Product)
         PrimaryKey(order, product)
+
 
     class Order(db.Entity):
         id = PrimaryKey(int, auto=True)
@@ -56,15 +61,19 @@ try:
         customer = Required(Customer)
         items = Set(OrderItem)
 
+
     class Category(db.Entity):
         name = Required(unicode, unique=True)
         products = Set(Product)
 
+
     db.generate_mapping(create_tables=True)
+
 
     def test_backend():
         from mixer.backend.pony import mixer
         assert mixer
+
 
     @db_session
     def test_mixer():

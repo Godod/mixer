@@ -8,7 +8,6 @@ from mixer.main import Mixer, TypeMixer
 
 
 class Test:
-
     """ Model scheme for base tests. """
 
     one = int
@@ -45,7 +44,6 @@ def test_typemixer_meta():
 
 
 def test_typemixer():
-
     class Scheme:
         id = int
         name = str
@@ -77,11 +75,9 @@ def test_fake():
 
 
 def test_random():
-    from mixer._compat import string_types
-
     mixer = TypeMixer(Test)
     test = mixer.blend(name=mixer.RANDOM)
-    assert isinstance(test.name, string_types)
+    assert isinstance(test.name, str)
 
     test = mixer.blend(name=mixer.RANDOM(int))
     assert isinstance(test.name, int)
@@ -200,7 +196,7 @@ def test_custom():
     mixer = Mixer()
 
     @mixer.middleware(Test)
-    def postprocess(x): # noqa
+    def postprocess(x):  # noqa
         x.name += ' Done'
         return x
 
@@ -262,7 +258,7 @@ def test_silence():
     mixer = Mixer()
 
     @mixer.middleware(Test)
-    def falsed(test): # noqa
+    def falsed(test):  # noqa
         raise Exception('Unhandled')
 
     with pytest.raises(Exception):

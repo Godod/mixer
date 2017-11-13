@@ -9,23 +9,21 @@ The module implements objects generation.
 :license: BSD, see LICENSE for more details.
 
 """
-from __future__ import absolute_import, unicode_literals
-
 import warnings
+from importlib import import_module
 from types import GeneratorType
 
 import logging
 import traceback
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 from contextlib import contextmanager
 from copy import deepcopy
-from functools import partial
+from functools import partial, partialmethod  # noqa
 from types import FunctionType, MethodType, BuiltinFunctionType
 
-from . import mix_types as t, _compat as _
+from . import mix_types as t
 from .factory import GenFactory
 from ._faker import faker
-
 
 SKIP_VALUE = object()
 
@@ -36,7 +34,6 @@ if not LOGGER.handlers and not LOGGER.root.handlers:
 
 
 class TypeMixerMeta(type):
-
     """ Cache typemixers by scheme. """
 
     mixers = dict()
@@ -44,29 +41,28 @@ class TypeMixerMeta(type):
     def __call__(cls, cls_type, mixer=None, factory=None, fake=True):
         backup = cls_type
         try:
-            cls_type = cls.__load_cls(cls_type)
+            cls_type = cls._load_cls(cls_type)
             assert cls_type
         except (AttributeError, AssertionError, LookupError):
             raise ValueError('Invalid scheme: %s' % backup)
 
         key = (mixer, cls_type, fake, factory)
         if key not in cls.mixers:
-            cls.mixers[key] = super(TypeMixerMeta, cls).__call__(
+            cls.mixers[key] = super().__call__(
                 cls_type, mixer=mixer, factory=factory, fake=fake)
 
         return cls.mixers[key]
 
     @staticmethod
-    def __load_cls(cls_type):
-        if isinstance(cls_type, _.string_types):
+    def _load_cls(cls_type):
+        if isinstance(cls_type, str):
             mod, cls_type = cls_type.rsplit('.', 1)
-            mod = _.import_module(mod)
+            mod = import_module(mod)
             cls_type = getattr(mod, cls_type)
         return cls_type
 
 
-class TypeMixer(_.with_metaclass(TypeMixerMeta)):
-
+class TypeMixer(metaclass=TypeMixerMeta):
     """ Generate objects by scheme. """
 
     factory = GenFactory
@@ -79,25 +75,25 @@ class TypeMixer(_.with_metaclass(TypeMixerMeta)):
 
     def __init__(self, cls, mixer=None, factory=None, fake=True):
         self.middlewares = []
-        self.__factory = factory or self.factory
-        self.__fake = fake
-        self.__gen_values = defaultdict(set)
-        self.__fabrics = dict()
-        self.__mixer = mixer
-        self.__scheme = cls
-        self.__fields = _.OrderedDict(self.__load_fields())
+        self._factory = factory or self.factory
+        self._fake = fake
+        self._gen_values = defaultdict(set)
+        self._fabrics = dict()
+        self._mixer = mixer
+        self._scheme = cls
+        self._fields = OrderedDict(self._load_fields())
 
     def __repr__(self):
-        return "<TypeMixer {0}>".format(self.__scheme)
+        return "<TypeMixer {0}>".format(self._scheme)
 
     def blend(self, **values):
         """ Generate object.
 
-        :param **values: Predefined fields
+        :param values: Predefined fields
         :return value: a generated value
 
         """
-        defaults = deepcopy(self.__fields)
+        defaults = deepcopy(self._fields)
 
         # Prepare relations
         for key, params in values.items():
@@ -139,13 +135,13 @@ class TypeMixer(_.with_metaclass(TypeMixerMeta)):
 
         target = self.postprocess(target, postprocess_values)
 
-        LOGGER.info('Blended: %s [%s]', target, self.__scheme) # noqa
+        LOGGER.debug('Blended: %s [%s]', target, self._scheme)  # noqa
         return target
 
     def postprocess(self, target, postprocess_values):
         """ Run the code after a generation. """
-        if self.__mixer:
-            target = self.__mixer.postprocess(target)
+        if self._mixer:
+            target = self._mixer.postprocess(target)
 
         for name, deffered in postprocess_values:
             setattr(target, name, deffered.value)
@@ -154,7 +150,7 @@ class TypeMixer(_.with_metaclass(TypeMixerMeta)):
 
     def populate_target(self, values):
         """ Populate a target by values. """
-        target = self.__scheme()
+        target = self._scheme()
         for name, value in values:
             setattr(target, name, value)
         return target
@@ -202,10 +198,11 @@ class TypeMixer(_.with_metaclass(TypeMixerMeta)):
 
         """
         if not random.scheme:
-            random = deepcopy(self.__fields.get(field_name))
+            random = deepcopy(self._fields.get(field_name))
 
         elif not isinstance(random.scheme, type):
-            return self.get_value(field_name, faker.random_element(random.choices))
+            return self.get_value(field_name,
+                                  faker.random_element(random.choices))
 
         return self.gen_value(field_name, random, fake=False)
 
@@ -221,7 +218,7 @@ class TypeMixer(_.with_metaclass(TypeMixerMeta)):
 
         """
         if not fake.scheme:
-            fake = deepcopy(self.__fields.get(field_name))
+            fake = deepcopy(self._fields.get(field_name))
 
         return self.gen_value(field_name, fake, fake=True)
 
@@ -231,11 +228,11 @@ class TypeMixer(_.with_metaclass(TypeMixerMeta)):
         :return : (name, value) for later use
 
         """
-        fake = self.__fake if fake is None else fake
+        fake = self._fake if fake is None else fake
         if field:
             fab = self.get_fabric(field, field_name, fake=fake)
         else:
-            fab = self.__factory.get_fabric(type(field))()
+            fab = self._factory.get_fabric(type(field))()
 
         try:
             value = fab()
@@ -243,18 +240,20 @@ class TypeMixer(_.with_metaclass(TypeMixerMeta)):
             value = None
         except Exception as exc:
             LOGGER.exception(exc)
-            raise ValueError("Generation for %s (%s) has been stopped. Exception: %s" % (
-                field_name, self.__scheme.__name__, exc))
+            raise ValueError(
+                "Generation for %s (%s) has been stopped. Exception: %s" % (
+                    field_name, self._scheme.__name__, exc))
 
         if unique and value is not SKIP_VALUE:
             counter = 0
             try:
-                while value in self.__gen_values[field_name]:
+                while value in self._gen_values[field_name]:
                     value = fab()
                     counter += 1
                     if counter > 100:
-                        raise RuntimeError("Cannot generate a unique value for %s" % field_name)
-                self.__gen_values[field_name].add(value)
+                        raise RuntimeError(
+                            "Cannot generate a unique value for %s" % field_name)
+                self._gen_values[field_name].add(value)
             except TypeError:
                 pass
 
@@ -271,19 +270,21 @@ class TypeMixer(_.with_metaclass(TypeMixerMeta)):
 
         """
         if fake is None:
-            fake = self.__fake
+            fake = self._fake
 
         if field.params:
-            return self.make_fabric(field.scheme, field_name, fake, kwargs=field.params)
+            return self.make_fabric(field.scheme, field_name, fake,
+                                    kwargs=field.params)
 
         key = (field.scheme, field_name, fake)
 
-        if key not in self.__fabrics:
-            self.__fabrics[key] = self.make_fabric(field.scheme, field_name, fake)
+        if key not in self._fabrics:
+            self._fabrics[key] = self.make_fabric(field.scheme, field_name,
+                                                  fake)
 
-        return self.__fabrics[key]
+        return self._fabrics[key]
 
-    def make_fabric(self, scheme, field_name=None, fake=None, kwargs=None): # noqa
+    def make_fabric(self, scheme, field_name=None, fake=None, kwargs=None):
         """ Make a fabric for scheme.
 
         :param field_class: Class for looking a fabric
@@ -295,10 +296,11 @@ class TypeMixer(_.with_metaclass(TypeMixerMeta)):
         """
         kwargs = {} if kwargs is None else kwargs
 
-        fab = self.__factory.get_fabric(scheme, field_name, fake)
+        fab = self._factory.get_fabric(scheme, field_name, fake)
         if not fab:
-            return partial(type(self)(scheme, mixer=self.__mixer, fake=self.__fake,
-                                      factory=self.__factory).blend, **kwargs)
+            return partial(
+                type(self)(scheme, mixer=self._mixer, fake=self._fake,
+                           factory=self._factory).blend, **kwargs)
 
         if kwargs:
             return partial(fab, **kwargs)
@@ -328,17 +330,17 @@ class TypeMixer(_.with_metaclass(TypeMixerMeta)):
 
         """
         if fake is None:
-            fake = self.__fake
+            fake = self._fake
 
-        field = self.__fields.get(field_name)
+        field = self._fields.get(field_name)
         if not field:
             return False
 
         key = (field.scheme, field_name, fake)
-        self.__fabrics[key] = func
+        self._fabrics[key] = func
 
         if not isinstance(func, (FunctionType, MethodType)):
-            self.__fabrics[key] = lambda: func
+            self._fabrics[key] = lambda: func
 
     @staticmethod
     def is_unique(field):
@@ -380,17 +382,16 @@ class TypeMixer(_.with_metaclass(TypeMixerMeta)):
         """ Reload the object from storage. """
         return deepcopy(obj)
 
-    def __load_fields(self):
+    def _load_fields(self):
         """ Return scheme's fields. """
-        for fname in dir(self.__scheme):
+        for fname in dir(self._scheme):
             if fname.startswith('_'):
                 continue
-            prop = getattr(self.__scheme, fname)
+            prop = getattr(self._scheme, fname)
             yield fname, t.Field(prop, fname)
 
 
 class ProxyMixer:
-
     """ A Mixer's proxy. Using for generate more than one object.
 
     ::
@@ -413,7 +414,7 @@ class ProxyMixer:
         result = []
 
         if self.guards:
-            return self.mixer._guard(scheme, self.guards, **values) # noqa
+            return self.mixer._guard(scheme, self.guards, **values)  # noqa
 
         for _ in range(self.count):
             result.append(
@@ -425,9 +426,8 @@ class ProxyMixer:
         raise AttributeError('Use "cycle" only for "blend"')
 
 
-# Support depricated attributes
+# Support deprecated attributes
 class _MetaMixer(type):
-
     FAKE = property(lambda cls: t.Fake())
     MIX = property(lambda cls: t.Mix())
     RANDOM = property(lambda cls: t.Random())
@@ -435,8 +435,7 @@ class _MetaMixer(type):
     SKIP = property(lambda cls: SKIP_VALUE)
 
 
-class Mixer(_.with_metaclass(_MetaMixer)):
-
+class Mixer(metaclass=_MetaMixer):
     """ This class is using for integration to an application.
 
     :param fake: (True) Generate fake data instead of random data.
@@ -474,8 +473,9 @@ class Mixer(_.with_metaclass(_MetaMixer)):
         """
         self.params = params
         self.faker = faker
-        self.__init_params__(fake=fake, loglevel=loglevel, silence=silence, locale=locale)
-        self.__factory = factory or self.type_mixer_cls.factory
+        self._init_params__(fake=fake, loglevel=loglevel, silence=silence,
+                            locale=locale)
+        self._factory = factory or self.type_mixer_cls.factory
 
     def __getattr__(self, name):
         if name in ['f', 'g', 'fake', 'random', 'mix', 'select']:
@@ -534,7 +534,7 @@ class Mixer(_.with_metaclass(_MetaMixer)):
         """
         return self.__class__.MIX
 
-    def __init_params__(self, locale=None, **params):
+    def _init_params__(self, locale=None, **params):
         self.params.update(params)
         if locale:
             faker.locale = locale
@@ -582,7 +582,7 @@ class Mixer(_.with_metaclass(_MetaMixer)):
         """
         return self.type_mixer_cls(
             scheme, mixer=self,
-            fake=self.params.get('fake'), factory=self.__factory)
+            fake=self.params.get('fake'), factory=self._factory)
 
     @staticmethod
     def postprocess(target):
@@ -593,7 +593,7 @@ class Mixer(_.with_metaclass(_MetaMixer)):
         """
         return target
 
-    @staticmethod # noqa
+    @staticmethod  # noqa
     def sequence(*args):
         """ Create a sequence for predefined values.
 
@@ -647,10 +647,11 @@ class Mixer(_.with_metaclass(_MetaMixer)):
                 while True:
                     for o in args:
                         yield o
+
             return gen()
 
         func = args and args[0] or None
-        if isinstance(func, _.string_types):
+        if isinstance(func, str):
             func = func.format
 
         elif func is None:
@@ -661,6 +662,7 @@ class Mixer(_.with_metaclass(_MetaMixer)):
             while True:
                 yield func(counter)
                 counter += 1
+
         return gen2()
 
     def cycle(self, count=5):
@@ -703,7 +705,7 @@ class Mixer(_.with_metaclass(_MetaMixer)):
         """
         type_mixer = self.type_mixer_cls(
             scheme, mixer=self, fake=self.params.get('fake'),
-            factory=self.__factory)
+            factory=self._factory)
 
         def wrapper(middleware):
             type_mixer.middlewares.append(middleware)
@@ -739,7 +741,7 @@ class Mixer(_.with_metaclass(_MetaMixer)):
         """
         fake = self.params.get('fake')
         type_mixer = self.type_mixer_cls(
-            scheme, mixer=self, fake=fake, factory=self.__factory)
+            scheme, mixer=self, fake=fake, factory=self._factory)
 
         for field_name, func in params.items():
             type_mixer.register(field_name, func, fake=fake)
@@ -764,10 +766,10 @@ class Mixer(_.with_metaclass(_MetaMixer)):
         _params['locale'] = self.faker.locale
 
         try:
-            self.__init_params__(**params)
+            self._init_params__(**params)
             yield self
         finally:
-            self.__init_params__(**_params)
+            self._init_params__(**_params)
 
     def reload(self, *objs):
         """ Reload the objects from storage. """
@@ -792,7 +794,7 @@ class Mixer(_.with_metaclass(_MetaMixer)):
         args, kwargs = guards
         seek = type_mixer.guard(*args, **kwargs)
         if seek:
-            LOGGER.info('Finded: %s [%s]', seek, type(seek)) # noqa
+            LOGGER.info('Finded: %s [%s]', seek, type(seek))  # noqa
             return seek
 
         return self.blend(scheme, **values)

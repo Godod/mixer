@@ -9,6 +9,7 @@ from sqlalchemy import func
 # from sqlalchemy.orm.interfaces import MANYTOONE
 from sqlalchemy.orm.collections import InstrumentedList
 from sqlalchemy.sql.type_api import TypeDecorator
+
 try:
     from sqlalchemy.orm.relationships import RelationshipProperty
 except ImportError:
@@ -26,7 +27,6 @@ from ..main import (
 
 
 class GenFactory(BaseFactory):
-
     """ Map a sqlalchemy classes to simple types. """
 
     types = {
@@ -45,15 +45,14 @@ class GenFactory(BaseFactory):
 
 
 class TypeMixer(BaseTypeMixer):
-
     """ TypeMixer for SQLAlchemy. """
 
     factory = GenFactory
 
     def __init__(self, cls, **params):
         """ Init TypeMixer and save the mapper. """
-        super(TypeMixer, self).__init__(cls, **params)
-        self.mapper = self.__scheme._sa_class_manager.mapper
+        super().__init__(cls, **params)
+        self.mapper = self._scheme._sa_class_manager.mapper
 
     def postprocess(self, target, postprocess_values):
         """ Fill postprocess values. """
@@ -65,15 +64,16 @@ class TypeMixer(BaseTypeMixer):
             if isinstance(value, t.Mix):
                 mixed.append((name, value))
                 continue
-            if isinstance(getattr(target, name), InstrumentedList) and not isinstance(value, list):
+            if isinstance(getattr(target, name),
+                          InstrumentedList) and not isinstance(value, list):
                 value = [value]
             setattr(target, name, value)
 
         for name, mix in mixed:
             setattr(target, name, mix & target)
 
-        if self.__mixer:
-            target = self.__mixer.postprocess(target)
+        if self._mixer:
+            target = self._mixer.postprocess(target)
 
         return target
 
@@ -105,14 +105,15 @@ class TypeMixer(BaseTypeMixer):
         :return : None or (name, value) for later use
 
         """
-        if not self.__mixer or not self.__mixer.params.get('session'):
+        if not self._mixer or not self._mixer.params.get('session'):
             return field_name, SKIP_VALUE
 
         relation = self.mapper.get_property(field_name)
-        session = self.__mixer.params.get('session')
-        value = session.query(
-            relation.mapper.class_
-        ).filter(*select.choices).order_by(func.random()).first()
+        session = self._mixer.params.get('session')
+        mapper = relation.mapper.class_ if hasattr(relation, 'mapper') \
+            else relation.parent.mapper.class_
+        value = session.query(mapper)
+        value = value.filter(*select.choices).order_by(func.random()).first()
         return self.get_value(field_name, value)
 
     @staticmethod
@@ -145,8 +146,9 @@ class TypeMixer(BaseTypeMixer):
 
         # According to the SQLAlchemy docs, autoincrement "only has an effect for columns which are
         # Integer derived (i.e. INT, SMALLINT, BIGINT) [and] Part of the primary key [...]".
-        return not column.nullable and not (column.autoincrement and column.primary_key and
-                                            isinstance(column.type, Integer))
+        return not column.nullable and not (
+        column.autoincrement and column.primary_key and
+        isinstance(column.type, Integer))
 
     def get_value(self, field_name, field_value):
         """ Get `value` as `field_name`.
@@ -154,13 +156,14 @@ class TypeMixer(BaseTypeMixer):
         :return : None or (name, value) for later use
 
         """
-        field = self.__fields.get(field_name)
+        field = self._fields.get(field_name)
         if field and isinstance(field.scheme, RelationshipProperty):
             return field_name, t._Deffered(field_value, field.scheme)
 
-        return super(TypeMixer, self).get_value(field_name, field_value)
+        return super().get_value(field_name, field_value)
 
-    def make_fabric(self, column, field_name=None, fake=False, kwargs=None): # noqa
+    def make_fabric(self, column, field_name=None, fake=False,
+                    kwargs=None):  # noqa
         """ Make values fabric for column.
 
         :param column: SqlAlchemy column
@@ -174,7 +177,8 @@ class TypeMixer(BaseTypeMixer):
 
         if isinstance(column, RelationshipProperty):
             return partial(type(self)(
-                column.mapper.class_, mixer=self.__mixer, fake=self.__fake, factory=self.__factory
+                column.mapper.class_, mixer=self._mixer, fake=self._fake,
+                factory=self._factory
             ).blend, **kwargs)
 
         ftype = type(column.type)
@@ -184,17 +188,17 @@ class TypeMixer(BaseTypeMixer):
         if TypeDecorator in ftype.__bases__:
             ftype = ftype.impl
 
-        stype = self.__factory.cls_to_simple(ftype)
+        stype = self._factory.cls_to_simple(ftype)
 
         if stype is str:
-            fab = super(TypeMixer, self).make_fabric(
+            fab = super().make_fabric(
                 stype, field_name=field_name, fake=fake, kwargs=kwargs)
             return lambda: fab()[:column.type.length]
 
         if ftype is Enum:
             return partial(faker.random_element, column.type.enums)
 
-        return super(TypeMixer, self).make_fabric(
+        return super().make_fabric(
             stype, field_name=field_name, fake=fake, kwargs=kwargs)
 
     def guard(self, *args, **kwargs):
@@ -204,7 +208,7 @@ class TypeMixer(BaseTypeMixer):
 
         """
         try:
-            session = self.__mixer.params.get('session')
+            session = self._mixer.params.get('session')
             assert session
         except (AttributeError, AssertionError):
             raise ValueError('Cannot make request to DB.')
@@ -223,20 +227,20 @@ class TypeMixer(BaseTypeMixer):
     def reload(self, obj):
         """ Reload object from database. """
         try:
-            session = self.__mixer.params.get('session')
+            session = self._mixer.params.get('session')
             session.expire(obj)
             session.refresh(obj)
             return obj
         except (AttributeError, AssertionError):
             raise ValueError('Cannot make request to DB.')
 
-    def __load_fields(self):
+    def _load_fields(self):
         """ Prepare SQLALchemyTypeMixer.
 
         Select columns and relations for data generation.
 
         """
-        mapper = self.__scheme._sa_class_manager.mapper
+        mapper = self._scheme._sa_class_manager.mapper
         relations = set()
         if hasattr(mapper, 'relationships'):
             for rel in mapper.relationships:
@@ -249,7 +253,6 @@ class TypeMixer(BaseTypeMixer):
 
 
 class Mixer(BaseMixer):
-
     """ Integration with SQLAlchemy. """
 
     type_mixer_cls = TypeMixer
@@ -262,7 +265,7 @@ class Mixer(BaseMixer):
         :param commit: (True) Commit instance to session after creation.
 
         """
-        super(Mixer, self).__init__(**params)
+        super().__init__(**params)
         self.params['session'] = session
         self.params['commit'] = bool(session) and commit
 

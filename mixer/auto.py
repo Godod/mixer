@@ -1,10 +1,10 @@
 """ Automatic backend selection. """
+from importlib import import_module
 
 from .main import ProxyMixer
-from . import _compat as _
 
 
-class MixerProxy(object):
+class MixerProxy:
 
     """ Load mixer for class automaticly.
 
@@ -36,18 +36,18 @@ class MixerProxy(object):
         :return instance:
 
         """
-        scheme = cls.__load_cls(model)
+        scheme = cls._load_cls(model)
         backend = cls.__store__.get(scheme)
 
         if not backend:
 
-            if cls.__is_django_model(scheme):
+            if cls._is_django_model(scheme):
                 from .backend.django import mixer as backend
 
-            elif cls.__is_sqlalchemy_model(scheme):
+            elif cls._is_sqlalchemy_model(scheme):
                 from .backend.sqlalchemy import mixer as backend
 
-            elif cls.__is_mongoengine_model(scheme):
+            elif cls._is_mongoengine_model(scheme):
                 from .backend.mongoengine import mixer as backend
 
             cls.__store__[scheme] = backend
@@ -55,15 +55,15 @@ class MixerProxy(object):
         return backend.blend(scheme, **params)
 
     @staticmethod
-    def __load_cls(cls_type):
-        if isinstance(cls_type, _.string_types):
+    def _load_cls(cls_type):
+        if isinstance(cls_type, str):
             mod, cls_type = cls_type.rsplit('.', 1)
-            mod = _.import_module(mod)
+            mod = import_module(mod)
             cls_type = getattr(mod, cls_type)
         return cls_type
 
     @staticmethod
-    def __is_django_model(model):
+    def _is_django_model(model):
         try:
             from django.db.models import Model
             return issubclass(model, Model)
@@ -71,11 +71,11 @@ class MixerProxy(object):
             return False
 
     @staticmethod
-    def __is_sqlalchemy_model(model):
+    def _is_sqlalchemy_model(model):
         return bool(getattr(model, '__mapper__', False))
 
     @staticmethod
-    def __is_mongoengine_model(model):
+    def _is_mongoengine_model(model):
         try:
             from mongoengine.base.document import BaseDocument
             return issubclass(model, BaseDocument)

@@ -3,13 +3,13 @@ import datetime as dt
 import pytest
 from peewee import *
 
-
 db = SqliteDatabase(':memory:')
 
 
 class Person(Model):
     name = CharField()
-    status = CharField(choices=(('user', 'user'), ('moderator', 'moderator'), ('admin', 'admin')))
+    status = CharField(choices=(
+        ('user', 'user'), ('moderator', 'moderator'), ('admin', 'admin')))
     created = DateTimeField(default=dt.datetime.now)
     birthday = DateField()
     is_relative = BooleanField()

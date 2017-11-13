@@ -7,16 +7,16 @@ from faker import Factory, Generator
 from faker.config import DEFAULT_LOCALE, AVAILABLE_LOCALES, PROVIDERS
 from faker.providers import BaseProvider
 
-
-GENRES = ('general', 'pop', 'dance', 'traditional', 'rock', 'alternative', 'rap', 'country',
-          'jazz', 'gospel', 'latin', 'reggae', 'comedy', 'historical', 'action', 'animation',
-          'documentary', 'family', 'adventure', 'fantasy', 'drama', 'crime', 'horror', 'music',
-          'mystery', 'romance', 'sport', 'thriller', 'war', 'western', 'fiction', 'epic',
-          'tragedy', 'parody', 'pastoral', 'culture', 'art', 'dance', 'drugs', 'social')
+GENRES = ('general', 'pop', 'dance', 'traditional', 'rock', 'alternative',
+          'rap', 'country', 'jazz', 'gospel', 'latin', 'reggae', 'comedy',
+          'historical', 'action', 'animation', 'documentary', 'family',
+          'adventure', 'fantasy', 'drama', 'crime', 'horror', 'music',
+          'mystery', 'romance', 'sport', 'thriller', 'war', 'western',
+          'fiction', 'epic', 'tragedy', 'parody', 'pastoral', 'culture', 'art',
+          'dance', 'drugs', 'social')
 
 
 class MixerProvider(BaseProvider):
-
     """ Implement some mixer methods. """
 
     def __init__(self, generator):
@@ -34,8 +34,7 @@ class MixerProvider(BaseProvider):
             provider.__lang__ = lang_found
             self.generator.add_provider(provider)
 
-    @classmethod
-    def choices(cls, elements=('a', 'b', 'c'), length=None):
+    def choices(self, elements=('a', 'b', 'c'), length=None):
         """ Get a pack of random elements from collection.
 
         :param elements: A collection
@@ -50,7 +49,7 @@ class MixerProvider(BaseProvider):
         """
         if length is None:
             length = len(elements)
-        return tuple(cls.random_element(elements) for _ in range(length))
+        return tuple(self.random_element(elements) for _ in range(length))
 
     def big_integer(self):
         """ Get a big integer.
@@ -58,7 +57,8 @@ class MixerProvider(BaseProvider):
         Get integer from -9223372036854775808 to 9223372036854775807.
 
         """
-        return self.generator.random_int(-9223372036854775808, 9223372036854775807)
+        return self.generator.random_int(-9223372036854775808,
+                                         9223372036854775807)
 
     def ip_generic(self, protocol=None):
         """ Get IP (v4 or v6) address.
@@ -97,41 +97,41 @@ class MixerProvider(BaseProvider):
         import uuid
         return str(uuid.uuid1())
 
-    @classmethod
-    def genre(cls):
-        return cls.random_element(GENRES)
+    def genre(self):
+        return self.random_element(GENRES)
 
-    @classmethod
-    def percent(cls):
-        return cls.random_int(0, 100)
+    def percent(self):
+        return self.random_int(0, 100)
 
-    @classmethod
-    def percent_decimal(cls):
-        return dc.Decimal("0.%d" % cls.random_int(0, 99)) + dc.Decimal('0.01')
+    def percent_decimal(self):
+        return dc.Decimal("0.%d" % self.random_int(0, 99)) + dc.Decimal('0.01')
 
     def title(self):
         words = self.generator.words(6)
         return " ".join(words).title()
 
     def coordinates(self):
-        return (self.generator.latitude(), self.generator.longitude())
+        return self.generator.latitude(), self.generator.longitude()
 
-    def pybytes(self, size=20):
-        return self.pystr(size).encode('utf-8')
+    def pybytes(self):
+        return self.generator.word().encode('utf-8')
+
+    def int_range(self):
+        int_list = list(range(self.positive_integer(100)))
+        return ','.join(map(str, int_list))
 
 
 class MixerGenerator(Generator):
-
     """ Support dynamic locales switch. """
 
     def __init__(self, locale=DEFAULT_LOCALE, providers=PROVIDERS, **config):
         self._locale = None
-        self._envs = defaultdict(self.__create_env)
+        self._envs = defaultdict(self._create_env)
         self.locale = locale
-        super(MixerGenerator, self).__init__(**config)
+        super().__init__(**config)
         self.env.load(providers)
 
-    def __create_env(self):
+    def _create_env(self):
         return MixerProvider(self)
 
     def __getattr__(self, name):

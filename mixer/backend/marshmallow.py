@@ -23,9 +23,9 @@ def get_nested(_scheme=None, _typemixer=None, _many=False, **kwargs):
     """Create nested objects."""
     obj = TypeMixer(
         _scheme,
-        mixer=_typemixer._TypeMixer__mixer,
-        factory=_typemixer._TypeMixer__factory,
-        fake=_typemixer._TypeMixer__fake,
+        mixer=_typemixer._mixer,
+        factory=_typemixer._factory,
+        fake=_typemixer._fake,
     ).blend(**kwargs)
     if _many:
         return [obj]
@@ -33,7 +33,6 @@ def get_nested(_scheme=None, _typemixer=None, _many=False, **kwargs):
 
 
 class GenFactory(BaseFactory):
-
     """Support for Marshmallow fields."""
 
     types = {
@@ -63,13 +62,12 @@ class GenFactory(BaseFactory):
 
 
 class TypeMixer(BaseTypeMixer):
-
     """ TypeMixer for Marshmallow. """
 
     factory = GenFactory
 
-    def __load_fields(self):
-        for name, field in self.__scheme._declared_fields.items():
+    def _load_fields(self):
+        for name, field in self._scheme._declared_fields.items():
             yield name, t.Field(field, name)
 
     def is_required(self, field):
@@ -79,7 +77,7 @@ class TypeMixer(BaseTypeMixer):
 
         """
         return field.scheme.required or (
-            self.__mixer.params['required'] and not field.scheme.dump_only)
+            self._mixer.params['required'] and not field.scheme.dump_only)
 
     @staticmethod
     def get_default(field):
@@ -88,42 +86,45 @@ class TypeMixer(BaseTypeMixer):
         :return value:
 
         """
-        return field.scheme.default is missing and SKIP_VALUE or field.scheme.default # noqa
+        return field.scheme.default is missing and SKIP_VALUE or field.scheme.default  # noqa
 
     def populate_target(self, values):
         """ Populate target. """
-        data, errors = self.__scheme().load(dict(values))
+        data, errors = self._scheme().load(dict(values))
         if errors:
             LOGGER.error("Mixer-marshmallow: %r", errors)
         return data
 
-    def make_fabric(self, field, field_name=None, fake=False, kwargs=None): # noqa
+    def make_fabric(self, field, field_name=None, fake=False,
+                    kwargs=None):  # noqa
         kwargs = {} if kwargs is None else kwargs
 
         if isinstance(field, fields.Nested):
-            kwargs.update({'_typemixer': self, '_scheme': type(field.schema), '_many': field.many})
+            kwargs.update({'_typemixer': self, '_scheme': type(field.schema),
+                           '_many': field.many})
 
         if isinstance(field, fields.List):
             fab = self.make_fabric(
-                field.container, field_name=field_name, fake=fake, kwargs=kwargs)
-            return lambda: [fab() for _ in range(faker.small_positive_integer(4))]
+                field.container, field_name=field_name, fake=fake,
+                kwargs=kwargs)
+            return lambda: [fab() for _ in
+                            range(faker.small_positive_integer(4))]
 
         for validator in field.validators:
             if isinstance(validator, validate.OneOf):
                 return partial(faker.random_element, validator.choices)
 
-        return super(TypeMixer, self).make_fabric(
+        return super().make_fabric(
             type(field), field_name=field_name, fake=fake, kwargs=kwargs)
 
 
 class Mixer(BaseMixer):
-
     """ Integration with Marshmallow. """
 
     type_mixer_cls = TypeMixer
 
     def __init__(self, *args, **kwargs):
-        super(Mixer, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         # All fields is required by default
         self.params.setdefault('required', True)

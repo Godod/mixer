@@ -4,7 +4,6 @@ from datetime import datetime
 
 from flask_sqlalchemy import SQLAlchemy, _SessionSignalEvents
 
-
 try:
     from unittest2 import TestCase
 except ImportError:
@@ -13,7 +12,6 @@ except ImportError:
 # Monkey patching for flask-sqlalchemy <= 1.0 (disable events)
 _SessionSignalEvents.session_signal_before_commit = staticmethod(lambda s: s)
 _SessionSignalEvents.session_signal_after_commit = staticmethod(lambda s: s)
-
 
 db = SQLAlchemy()
 
@@ -71,12 +69,12 @@ class Node(db.Model):
 
 
 class MixerTestFlask(TestCase):
-
     def setUp(self):
         from flask import Flask
 
         self.app = Flask(__name__)
         self.app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
+        self.app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
         db.init_app(self.app)
 
     def test_base(self):

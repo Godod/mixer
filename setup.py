@@ -45,7 +45,7 @@ setup(
     platforms=('Any'),
     keywords = "django flask sqlalchemy testing mock stub mongoengine data".split(), # noqa
 
-    author='Kirill Klenov',
+    author='Kirill Klenov and Denys Tovstohan',
     author_email='horneds@gmail.com',
     url='http://github.com/klen/mixer',
     classifiers=[

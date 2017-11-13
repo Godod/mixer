@@ -7,7 +7,8 @@ import pytest
 from django import VERSION
 from django.core.management import call_command
 
-from .django_app.models import Rabbit, models, Hole, Door, Customer, Simple, Client, Tag, Message
+from .django_app.models import Rabbit, models, Hole, Door, Customer, Simple, \
+    Client, Tag, Message
 from mixer.backend.django import Mixer
 
 
@@ -17,7 +18,8 @@ def mixer(request):
         call_command('migrate', interactive=False, verbosity=0)
     else:
         call_command('syncdb', interactive=False, verbosity=0)
-    request.addfinalizer(lambda: call_command('flush', interactive=False, verbosity=0))
+    request.addfinalizer(lambda: call_command('flush', interactive=False,
+                                              verbosity=0))
     return Mixer()
 
 
@@ -96,13 +98,13 @@ def test_custom(mixer):
     assert fabric() == "Always same"
 
     mixer = Mixer(factory=MyFactory, fake=False)
-    assert mixer._Mixer__factory == MyFactory
+    assert mixer._factory == MyFactory
 
     test = mixer.blend(Rabbit)
     assert test.title == "Always same"
 
     @mixer.middleware('auth.user')
-    def encrypt_password(user): # noqa
+    def encrypt_password(user):  # noqa
         user.set_password(user.password)
         return user
 
@@ -240,7 +242,6 @@ def test_invalid_scheme(mixer):
     VERSION >= (1, 8, 0),
     reason='Django 1.8 prevents unsaved model instances from being assigned to a ForeignKey')
 def test_ctx(mixer):
-
     with mixer.ctx(commit=False):
         hole = mixer.blend(Hole)
         assert hole

@@ -43,7 +43,7 @@ def _wordIter(text, separator='.'):
             yield sub
 
 
-class MarkovChain(object):
+class MarkovChain:
 
     def __init__(self, dbFilePath=None):
         self.dbFilePath = dbFilePath

@@ -15,7 +15,6 @@ from .sqlalchemy import TypeMixer, Mixer as BaseMixer
 
 
 class Mixer(BaseMixer):
-
     """ Init application. """
 
     type_mixer_cls = TypeMixer
@@ -28,7 +27,7 @@ class Mixer(BaseMixer):
         :param commit: (True) Commit instance to session after creation.
 
         """
-        super(Mixer, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.params['commit'] = commit
         if app:
             self.init_app(app)

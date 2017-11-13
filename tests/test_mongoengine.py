@@ -94,5 +94,4 @@ def test_relation():
     bookmark = mixer.blend(Bookmark, bookmark=mixer.RANDOM)
     assert bookmark.bookmark
 
-
 # pylama:ignore=W0401,W0614

@@ -1,5 +1,8 @@
-|logo| Mixer
+|logo| Mixer for python3
 ############
+
+**NOTE: This is rewritten module of original Mixer_, because author does not
+fix bugs and improve the code.**
 
 Mixer is an application to generate instances of Django or SQLAlchemy models.
 It's useful for testing and fixtures replacement. Fast and convenient test-data
@@ -37,6 +40,8 @@ Mixer supports:
 .. image:: http://img.shields.io/pypi/l/mixer.svg?style=flat-square
     :target: https://pypi.python.org/pypi/mixer
     :alt: License
+
+.. _Mixer: https://github.com/klen/mixer
 
 
 .. _documentation:

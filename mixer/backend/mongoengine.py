@@ -79,7 +79,8 @@ def get_linestring(length=5, **kwargs):
     :return dict:
 
     """
-    return dict(type='LineString', coordinates=[faker.coordinates() for _ in range(length)])
+    return dict(type='LineString',
+                coordinates=[faker.coordinates() for _ in range(length)])
 
 
 def get_polygon(length=5, **kwargs):
@@ -107,16 +108,15 @@ def get_generic_reference(_typemixer=None, **params):
     meta = type(_typemixer)
     scheme = faker.random_element([
         m for (_, m, _, _) in meta.mixers.keys()
-        if issubclass(m, Document) and m is not _typemixer._TypeMixer__scheme # noqa
+        if issubclass(m, Document) and m is not _typemixer._scheme # noqa
     ])
 
-    return TypeMixer(scheme, mixer=_typemixer._TypeMixer__mixer,
-                     factory=_typemixer._TypeMixer__factory,
-                     fake=_typemixer._TypeMixer__fake).blend(**params)
+    return TypeMixer(scheme, mixer=_typemixer._mixer,
+                     factory=_typemixer._factory,
+                     fake=_typemixer._fake).blend(**params)
 
 
 class GenFactory(BaseFactory):
-
     """ Map a mongoengine classes to simple types. """
 
     types = {
@@ -142,12 +142,12 @@ class GenFactory(BaseFactory):
 
 
 class TypeMixer(BaseTypeMixer):
-
     """ TypeMixer for Mongoengine. """
 
     factory = GenFactory
 
-    def make_fabric(self, me_field, field_name=None, fake=None, kwargs=None): # noqa
+    def make_fabric(self, me_field, field_name=None, fake=None,
+                    kwargs=None):  # noqa
         """ Make a fabric for field.
 
         :param me_field: Mongoengine field's instance
@@ -169,7 +169,7 @@ class TypeMixer(BaseTypeMixer):
             return partial(faker.random_element, choices)
 
         if ftype is StringField:
-            fab = super(TypeMixer, self).make_fabric(
+            fab = super().make_fabric(
                 ftype, field_name=field_name, fake=fake, kwargs=kwargs)
             return lambda: fab()[:me_field.max_length]
 
@@ -186,7 +186,7 @@ class TypeMixer(BaseTypeMixer):
         elif ftype is DecimalField:
             kwargs['right_digits'] = me_field.precision
 
-        return super(TypeMixer, self).make_fabric(
+        return super().make_fabric(
             ftype, field_name=field_name, fake=fake, kwargs=kwargs)
 
     @staticmethod
@@ -227,15 +227,16 @@ class TypeMixer(BaseTypeMixer):
 
     def gen_select(self, field_name, select):
         """ Select related document from mongo. """
-        field = self.__fields.get(field_name)
+        field = self._fields.get(field_name)
         if not field:
-            return super(TypeMixer, self).gen_select(field_name, select)
+            return super().gen_select(field_name, select)
 
-        return field.name, field.scheme.document_type.objects.filter(**select.params).first()
+        return field.name, field.scheme.document_type.objects.filter(
+            **select.params).first()
 
     def guard(self, *args, **kwargs):
         """ Ensure for an objects are exist in DB. """
-        qs = self.__scheme.objects(*args, **kwargs)
+        qs = self._scheme.objects(*args, **kwargs)
         count = len(qs)
         if count == 1:
             return qs[0]
@@ -243,16 +244,14 @@ class TypeMixer(BaseTypeMixer):
 
     def reload(self, obj):
         """ Reload object from storage. """
-        return self.__scheme.get(id=obj.id)
+        return self._scheme.get(id=obj.id)
 
-    def __load_fields(self):
-        for fname, field in self.__scheme._fields.items():
-
+    def _load_fields(self):
+        for fname, field in self._scheme._fields.items():
             yield fname, t.Field(field, fname)
 
 
 class Mixer(BaseMixer):
-
     """ Mixer class for mongoengine.
 
     Default mixer (desnt save a generated instances to db)
@@ -280,7 +279,7 @@ class Mixer(BaseMixer):
         :param commit: (True) Save object to Mongo DB.
 
         """
-        super(Mixer, self).__init__(**params)
+        super().__init__(**params)
         self.params['commit'] = commit
 
     def postprocess(self, target):
